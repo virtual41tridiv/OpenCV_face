@@ -2,6 +2,7 @@
 
 import cv2
 import numpy as np
+import os
 
 #init camera
 cap = cv2.VideoCapture(0)
@@ -11,6 +12,7 @@ face_cascade = cv2.CascadeClassifier("haarcascade_frontalface_alt.xml")
 skip = 0
 face_data = []
 dataset_path = './data/'
+os.makedirs(dataset_path, exist_ok=True)
 
 
 file_name = input("Enter the name of the person:")
@@ -62,7 +64,7 @@ print(face_data.shape)
 
 # Save the data
 
-np.Save(dataset_path+file_name+'.npy',face_data)
+np.save(dataset_path+file_name+'.npy',face_data)
 print("Data successfully saved at"+dataset_path+file_name+'.npy')
 
 cap.release()

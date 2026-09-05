@@ -1,20 +1,26 @@
 # OpenCV_face
 
-A small set of Python scripts for playing with real-time face and eye detection
+A small set of Python scripts that build up to real-time face recognition,
 using OpenCV's Haar cascade classifiers and your webcam.
 
-The project walks through four steps, each in its own script:
+The project walks through five steps, each in its own script:
 
 1. read and display a still image,
 2. read a live stream from the webcam,
 3. detect faces and eyes in that live stream,
-4. crop the detected faces and save them to disk as a dataset.
+4. crop the detected faces and save them to disk as a dataset,
+5. recognise who is on camera by matching against those datasets.
 
 ## Requirements
 
 - Python 3.8 or newer
 - A webcam (the built-in FaceTime camera is fine)
-- `opencv-python` and `numpy`
+- `opencv-python` **4.x** and `numpy`
+
+> OpenCV 5.0 removed `CascadeClassifier` and the Haar cascade API altogether, so
+> this project does not run on it. `requirements.txt` pins `opencv-python<5`.
+> If you install OpenCV yourself, keep it on the 4.x series, or you will get
+> `AttributeError: module 'cv2' has no attribute 'CascadeClassifier'`.
 
 ## Setup on macOS
 
@@ -82,8 +88,30 @@ flattened and saved to `data/<name>.npy`.
 Note that the window only refreshes while a face is actually detected, so if
 nothing happens, move into better lighting and face the camera straight on.
 
+```bash
+python face_recognition.py
+```
+
+Loads every dataset in `data/`, then labels faces in the live stream with the
+name of whoever they match. Press `q` to quit.
+
+Faces that do not match anything closely enough are labelled `Unknown` in red
+rather than being forced onto the nearest person.
+
 > `q` must be pressed while an OpenCV **window** has focus, not the terminal. If a
 > window ever refuses to close, `Ctrl+C` in the terminal will do it.
+
+## Typical workflow
+
+```bash
+python face_data_collection.py    # enter "alice", move around, press q
+python face_data_collection.py    # enter "bob",   move around, press q
+python face_recognition.py        # both are now labelled on camera
+```
+
+Aim for at least 20–30 captured samples per person (the counter prints as it
+collects) and vary your angle and expression a little, since the classifier only
+knows what it has seen.
 
 ## Files
 
@@ -93,6 +121,7 @@ nothing happens, move into better lighting and face the camera straight on.
 | `opencv_web.py` | Streams the webcam to a window |
 | `opencv_face.py` | Detects faces and eyes in the webcam stream |
 | `face_data_collection.py` | Crops detected faces and saves them as a `.npy` dataset |
+| `face_recognition.py` | Identifies faces in the live stream with a KNN classifier |
 | `haarcascade_frontalface_alt.xml` | Pre-trained frontal-face cascade |
 | `haarcascade_eye.xml` | Pre-trained eye cascade |
 
@@ -114,15 +143,37 @@ scales. The two numbers are the knobs worth tuning:
 Detection works on the grayscale frame, since the filters only care about
 intensity, while the rectangles are drawn on the original color frame.
 
+### Recognition
+
+Detection finds *a* face; recognition works out *whose* it is. Each cropped face
+is a 100×100 colour image, which flattened is just a list of 30,000 numbers — a
+single point in 30,000-dimensional space. `face_recognition.py` loads every
+saved point, and for a new face measures the straight-line distance to all of
+them, takes the `k` (default 5) nearest, and lets them vote on the answer.
+
+That is K-nearest-neighbours, and it has no training step at all: the dataset
+*is* the model. It is the simplest thing that works, which makes it a good
+teaching example and a poor production system — it compares against every stored
+face on every frame, and it compares raw pixels, so lighting shifts move a face
+further than a change of person can.
+
+If the mean distance to those neighbours exceeds `max_distance` (6000), the face
+is reported as `Unknown`. Without that check KNN always answers with *someone*,
+since there is always a nearest point. Tune the threshold in the script if you
+get the wrong answer: too many false `Unknown`s means raise it, strangers being
+labelled with a name means lower it.
+
 ## Limitations
 
 - Haar cascades only reliably detect **frontal** faces. Profile views, heavy
   tilt, glasses, or poor lighting will drop detections.
-- `face_data_collection.py` collects data but nothing in this repo classifies it
-  yet — pairing it with a K-nearest-neighbours classifier over the saved `.npy`
-  files is the natural next step.
-- Faces very close to the frame edge can fail to crop, because the script pads
-  the region by 10 pixels before resizing.
+- Recognition compares raw pixels, so it is sensitive to lighting, distance and
+  head angle. Capture your samples in roughly the conditions you will use it in.
+- KNN scans the whole dataset for every face in every frame. That is fine for a
+  few hundred samples and will crawl at tens of thousands.
+- It cannot tell a photo from a person — holding up a picture fools it. A modern
+  embedding model (OpenCV's `FaceRecognizerSF`, `face_recognition`, or any
+  FaceNet-style network) is the upgrade path if you want robustness.
 
 ## License
 

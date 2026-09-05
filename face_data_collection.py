@@ -38,7 +38,14 @@ while True:
          #Extract(crop out the image):Region of intrest
 
          offset = 10
-         face_section = frame[y-offset:y+h+offset,x-offset:x+w+offset]
+         #Clamp to the frame, otherwise a face at the edge gives an empty crop
+         y1,y2 = max(y-offset,0), min(y+h+offset,frame.shape[0])
+         x1,x2 = max(x-offset,0), min(x+w+offset,frame.shape[1])
+         face_section = frame[y1:y2,x1:x2]
+
+         if face_section.size == 0:
+             continue
+
          face_section = cv2.resize(face_section,(100,100))
 
          skip +=1
